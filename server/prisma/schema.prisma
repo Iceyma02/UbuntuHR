@@ -1,0 +1,411 @@
+// ZimHR Database Schema
+// Production-grade PostgreSQL schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// COMPANY & AUTH
+// ─────────────────────────────────────────
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  regNumber   String?
+  taxNumber   String?
+  nssaNumber  String?
+  address     String?
+  city        String   @default("Harare")
+  country     String   @default("Zimbabwe")
+  phone       String?
+  email       String?
+  logoUrl     String?
+  currency    String   @default("USD")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  employees   Employee[]
+  departments Department[]
+  payrollRuns PayrollRun[]
+  leaveTypes  LeaveType[]
+  publicHols  PublicHoliday[]
+  complianceLogs ComplianceLog[]
+
+  @@map("companies")
+}
+
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  password   String
+  firstName  String
+  lastName   String
+  role       UserRole @default(HR_MANAGER)
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id])
+  isActive   Boolean  @default(true)
+  lastLogin  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  auditLogs  AuditLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  HR_MANAGER
+  PAYROLL_OFFICER
+  MANAGER
+  EMPLOYEE
+}
+
+// ─────────────────────────────────────────
+// EMPLOYEE RECORDS - Module 3
+// ─────────────────────────────────────────
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String
+  code      String?
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  managerId String?
+  employees Employee[]
+  createdAt DateTime @default(now())
+
+  @@map("departments")
+}
+
+model Employee {
+  id               String           @id @default(cuid())
+  employeeNumber   String
+  companyId        String
+  company          Company          @relation(fields: [companyId], references: [id])
+  departmentId     String?
+  department       Department?      @relation(fields: [departmentId], references: [id])
+
+  // Personal Info
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime?
+  gender           Gender?
+  nationalId       String?
+  passportNumber   String?
+  taxNumber        String?          // ZIMRA tax number
+  nssaNumber       String?
+  phone            String?
+  email            String?
+  address          String?
+  nextOfKin        String?
+  nextOfKinPhone   String?
+
+  // Employment Info
+  jobTitle         String
+  contractType     ContractType     @default(PERMANENT)
+  startDate        DateTime
+  endDate          DateTime?        // For contract employees
+  probationEnd     DateTime?
+  employmentStatus EmploymentStatus @default(ACTIVE)
+
+  // Salary
+  basicSalary      Float
+  currency         String           @default("USD")
+  paymentMethod    PaymentMethod    @default(BANK_TRANSFER)
+  bankName         String?
+  bankAccount      String?
+  bankBranch       String?
+  ecocashNumber    String?
+
+  // Termination
+  terminationDate   DateTime?
+  terminationReason String?
+  terminationType   TerminationType?
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  salaryHistory    SalaryHistory[]
+  payrollItems     PayrollItem[]
+  leaveBalances    LeaveBalance[]
+  leaveRequests    LeaveRequest[]
+  documents        EmployeeDocument[]
+  payslips         Payslip[]
+
+  @@unique([companyId, employeeNumber])
+  @@map("employees")
+}
+
+model SalaryHistory {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  oldSalary   Float
+  newSalary   Float
+  currency    String   @default("USD")
+  effectiveDate DateTime
+  reason      String?
+  changedBy   String?
+  createdAt   DateTime @default(now())
+
+  @@map("salary_history")
+}
+
+model EmployeeDocument {
+  id           String       @id @default(cuid())
+  employeeId   String
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+  documentType DocumentType
+  fileName     String
+  fileUrl      String
+  uploadedAt   DateTime     @default(now())
+
+  @@map("employee_documents")
+}
+
+enum Gender { MALE FEMALE OTHER }
+enum ContractType { PERMANENT CONTRACT CASUAL PART_TIME INTERN }
+enum EmploymentStatus { ACTIVE PROBATION ON_LEAVE SUSPENDED TERMINATED }
+enum PaymentMethod { BANK_TRANSFER ECOCASH CASH ZIPIT }
+enum TerminationType { RESIGNATION RETRENCHMENT DISMISSAL RETIREMENT CONTRACT_END DEATH }
+enum DocumentType { NATIONAL_ID PASSPORT QUALIFICATIONS CONTRACT MEDICAL OTHER }
+
+// ─────────────────────────────────────────
+// PAYROLL ENGINE - Module 1
+// ─────────────────────────────────────────
+
+model PayrollRun {
+  id            String        @id @default(cuid())
+  companyId     String
+  company       Company       @relation(fields: [companyId], references: [id])
+  period        String        // "2025-04"
+  month         Int
+  year          Int
+  currency      String        @default("USD")
+  status        PayrollStatus @default(DRAFT)
+  totalGross    Float         @default(0)
+  totalPaye     Float         @default(0)
+  totalNssa     Float         @default(0)
+  totalZimdef   Float         @default(0)
+  totalNet      Float         @default(0)
+  employeeCount Int           @default(0)
+  lockedAt      DateTime?
+  lockedBy      String?
+  processedAt   DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items         PayrollItem[]
+  payslips      Payslip[]
+
+  @@unique([companyId, period])
+  @@map("payroll_runs")
+}
+
+model PayrollItem {
+  id             String     @id @default(cuid())
+  payrollRunId   String
+  payrollRun     PayrollRun @relation(fields: [payrollRunId], references: [id])
+  employeeId     String
+  employee       Employee   @relation(fields: [employeeId], references: [id])
+
+  // Earnings
+  basicSalary    Float
+  overtime       Float      @default(0)
+  bonus          Float      @default(0)
+  commission     Float      @default(0)
+  allowances     Float      @default(0)
+  grossEarnings  Float
+
+  // Deductions
+  paye           Float      @default(0)  // ZIMRA PAYE
+  aidsLevy       Float      @default(0)  // 3% of PAYE
+  nssaEmployee   Float      @default(0)  // 3.5%
+  zimdef         Float      @default(0)  // 1% basic
+  otherDeductions Float     @default(0)
+  totalDeductions Float     @default(0)
+
+  // Net
+  netPay         Float
+
+  // Employer costs
+  nssaEmployer   Float      @default(0)  // 3.5%
+  standardsLevy  Float      @default(2)  // Fixed $2
+
+  currency       String     @default("USD")
+  overtimeHours  Float      @default(0)
+  notes          String?
+  createdAt      DateTime   @default(now())
+
+  @@unique([payrollRunId, employeeId])
+  @@map("payroll_items")
+}
+
+model Payslip {
+  id           String     @id @default(cuid())
+  payrollRunId String
+  payrollRun   PayrollRun @relation(fields: [payrollRunId], references: [id])
+  employeeId   String
+  employee     Employee   @relation(fields: [employeeId], references: [id])
+  pdfUrl       String?
+  emailSent    Boolean    @default(false)
+  whatsappSent Boolean    @default(false)
+  sentAt       DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@unique([payrollRunId, employeeId])
+  @@map("payslips")
+}
+
+enum PayrollStatus { DRAFT PROCESSING REVIEW LOCKED PAID CANCELLED }
+
+// ─────────────────────────────────────────
+// LEAVE MANAGEMENT - Module 4
+// ─────────────────────────────────────────
+
+model LeaveType {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  name            String
+  code            String
+  daysPerYear     Int
+  isPaid          Boolean  @default(true)
+  requiresApproval Boolean @default(true)
+  carryOver       Boolean  @default(false)
+  maxCarryOver    Int?
+  labourActRef    String?  // Reference to Labour Act section
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  balances        LeaveBalance[]
+  requests        LeaveRequest[]
+
+  @@unique([companyId, code])
+  @@map("leave_types")
+}
+
+model LeaveBalance {
+  id           String    @id @default(cuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+  leaveTypeId  String
+  leaveType    LeaveType @relation(fields: [leaveTypeId], references: [id])
+  year         Int
+  entitled     Float
+  used         Float     @default(0)
+  pending      Float     @default(0)
+  remaining    Float
+  cashValue    Float?    // For leave encashment calculations
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id           String        @id @default(cuid())
+  employeeId   String
+  employee     Employee      @relation(fields: [employeeId], references: [id])
+  leaveTypeId  String
+  leaveType    LeaveType     @relation(fields: [leaveTypeId], references: [id])
+  startDate    DateTime
+  endDate      DateTime
+  totalDays    Float
+  reason       String?
+  status       LeaveStatus   @default(PENDING)
+  approvedBy   String?
+  approvedAt   DateTime?
+  rejectedBy   String?
+  rejectedAt   DateTime?
+  rejectReason String?
+  attachmentUrl String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("leave_requests")
+}
+
+model PublicHoliday {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+  name      String
+  date      DateTime
+  year      Int
+  isFixed   Boolean @default(true)
+
+  @@map("public_holidays")
+}
+
+enum LeaveStatus { PENDING APPROVED REJECTED CANCELLED }
+
+// ─────────────────────────────────────────
+// COMPLIANCE - Module 2
+// ─────────────────────────────────────────
+
+model ComplianceLog {
+  id          String          @id @default(cuid())
+  companyId   String
+  company     Company         @relation(fields: [companyId], references: [id])
+  type        ComplianceType
+  period      String          // "2025-04"
+  amount      Float?
+  dueDate     DateTime
+  filedDate   DateTime?
+  status      ComplianceStatus @default(PENDING)
+  reference   String?
+  notes       String?
+  generatedUrl String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("compliance_logs")
+}
+
+model TaxTable {
+  id          String   @id @default(cuid())
+  year        Int
+  currency    String   @default("USD")
+  lowerBand   Float
+  upperBand   Float?
+  rate        Float    // percentage e.g. 20
+  fixedAmount Float    @default(0)
+  taxCredit   Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  @@map("tax_tables")
+}
+
+enum ComplianceType { PAYE NSSA ZIMDEF STANDARDS_LEVY P6_CERTIFICATE ITF16 }
+enum ComplianceStatus { PENDING FILED LATE OVERDUE EXEMPT }
+
+// ─────────────────────────────────────────
+// AUDIT
+// ─────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  entity     String
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@map("audit_logs")
+}
