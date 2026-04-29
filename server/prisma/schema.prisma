@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 // ─────────────────────────────────────────
@@ -172,12 +173,52 @@ model EmployeeDocument {
   @@map("employee_documents")
 }
 
-enum Gender { MALE FEMALE OTHER }
-enum ContractType { PERMANENT CONTRACT CASUAL PART_TIME INTERN }
-enum EmploymentStatus { ACTIVE PROBATION ON_LEAVE SUSPENDED TERMINATED }
-enum PaymentMethod { BANK_TRANSFER ECOCASH CASH ZIPIT }
-enum TerminationType { RESIGNATION RETRENCHMENT DISMISSAL RETIREMENT CONTRACT_END DEATH }
-enum DocumentType { NATIONAL_ID PASSPORT QUALIFICATIONS CONTRACT MEDICAL OTHER }
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ContractType {
+  PERMANENT
+  CONTRACT
+  CASUAL
+  PART_TIME
+  INTERN
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  PROBATION
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  ECOCASH
+  CASH
+  ZIPIT
+}
+
+enum TerminationType {
+  RESIGNATION
+  RETRENCHMENT
+  DISMISSAL
+  RETIREMENT
+  CONTRACT_END
+  DEATH
+}
+
+enum DocumentType {
+  NATIONAL_ID
+  PASSPORT
+  QUALIFICATIONS
+  CONTRACT
+  MEDICAL
+  OTHER
+}
 
 // ─────────────────────────────────────────
 // PAYROLL ENGINE - Module 1
@@ -267,7 +308,14 @@ model Payslip {
   @@map("payslips")
 }
 
-enum PayrollStatus { DRAFT PROCESSING REVIEW LOCKED PAID CANCELLED }
+enum PayrollStatus {
+  DRAFT
+  PROCESSING
+  REVIEW
+  LOCKED
+  PAID
+  CANCELLED
+}
 
 // ─────────────────────────────────────────
 // LEAVE MANAGEMENT - Module 4
@@ -348,7 +396,12 @@ model PublicHoliday {
   @@map("public_holidays")
 }
 
-enum LeaveStatus { PENDING APPROVED REJECTED CANCELLED }
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
 
 // ─────────────────────────────────────────
 // COMPLIANCE - Module 2
@@ -387,8 +440,22 @@ model TaxTable {
   @@map("tax_tables")
 }
 
-enum ComplianceType { PAYE NSSA ZIMDEF STANDARDS_LEVY P6_CERTIFICATE ITF16 }
-enum ComplianceStatus { PENDING FILED LATE OVERDUE EXEMPT }
+enum ComplianceType {
+  PAYE
+  NSSA
+  ZIMDEF
+  STANDARDS_LEVY
+  P6_CERTIFICATE
+  ITF16
+}
+
+enum ComplianceStatus {
+  PENDING
+  FILED
+  LATE
+  OVERDUE
+  EXEMPT
+}
 
 // ─────────────────────────────────────────
 // AUDIT
