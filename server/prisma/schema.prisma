@@ -7,8 +7,8 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url       = env("postgresql://neondb_owner:npg_oY2e7DONwbRv@ep-rapid-pond-an253qgl-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
-  directUrl = env("postgresql://neondb_owner:npg_oY2e7DONwbRv@ep-rapid-pond-an253qgl.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 // ─────────────────────────────────────────
