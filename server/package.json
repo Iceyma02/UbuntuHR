@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
+    "vercel-build": "npx prisma generate",
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "db:push": "npx prisma db push"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",
