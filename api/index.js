@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
 const authRoutes       = require("../server/routes/auth");
@@ -16,12 +15,7 @@ const companyRoutes    = require("../server/routes/company");
 const app = express();
 
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({
-  origin: process.env.CLIENT_URL || "*",
-  credentials: true,
-}));
-
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 500 }));
+app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -34,11 +28,12 @@ app.use("/api/payslips",   payslipRoutes);
 app.use("/api/analytics",  analyticsRoutes);
 app.use("/api/company",    companyRoutes);
 
-app.get("/api/health", (_, res) => res.json({ status: "ZimHR API running ✓", version: "1.0.0" }));
+app.get("/api/health", (_, res) => res.json({ status: "UbuntuHR API running ✓" }));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({ error: err.message || "Internal server error" });
 });
 
+// Vercel needs module.exports = app
 module.exports = app;
