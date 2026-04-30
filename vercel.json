@@ -1,14 +1,13 @@
 {
   "version": 2,
-  "buildCommand": "cd client && npm install && npm run build",
+  "buildCommand": "npm run vercel-build",
   "outputDirectory": "client/build",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" }
+    { "source": "/api/:path*", "destination": "/api/index" }
   ],
   "functions": {
     "api/index.js": {
-      "maxDuration": 30,
-      "memory": 512
+      "maxDuration": 30
     }
   }
 }
