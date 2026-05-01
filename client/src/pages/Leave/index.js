@@ -197,7 +197,7 @@ export default function Leave() {
             {liability?.report?.length > 0 ? (
               <table className="data-table">
                 <thead>
-                  <tr><th>Employee</th><th>Salary</th><th>Entitled</th><th>Used</th><th>Remaining</th><th>Cash Value</th><th>Risk</th></tr>
+                  <tr><th>Employee</th><th>Salary</th><th>Entitled</th><th>Used</th><th>Pending</th><th>Remaining</th><th>Cash Value</th><th>Risk</th></tr>
                 </thead>
                 <tbody>
                   {liability.report.map((r, i) => (
@@ -205,7 +205,8 @@ export default function Leave() {
                       <td style={{ fontWeight: 500 }}>{r.name}</td>
                       <td style={{ color: "var(--muted)" }}>{fmtUSD(r.basicSalary)}</td>
                       <td>{r.entitled}d</td>
-                      <td style={{ color: "var(--muted)" }}>{r.used}d</td>
+                      <td style={{ color: r.used > 0 ? "var(--green)" : "var(--muted)" }}>{r.used}d</td>
+                      <td style={{ color: r.pending > 0 ? "var(--orange)" : "var(--muted)" }}>{r.pending || 0}d</td>
                       <td style={{ color: "var(--gold)", fontWeight: 600 }}>{r.remaining}d</td>
                       <td style={{ color: "var(--red)", fontWeight: 600 }}>{fmtUSD(r.cashValue)}</td>
                       <td><span className={`badge ${r.risk === "HIGH" ? "badge-red" : r.risk === "MEDIUM" ? "badge-gold" : "badge-green"}`}>{r.risk}</span></td>
