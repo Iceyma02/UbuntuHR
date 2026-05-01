@@ -146,26 +146,39 @@ router.get("/balances/:employeeId", async (req, res) => {
 router.get("/liability", async (req, res) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
-    
     const employees = await prisma.employee.findMany({
-      where: { 
-        companyId: req.user.companyId, 
-        employmentStatus: { in: ["ACTIVE", "PROBATION"] } 
-      },
+      where: { companyId: req.user.companyId, employmentStatus: { in: ["ACTIVE", "PROBATION"] } },
       include: {
         leaveBalances: {
           where: { year },
-          include: { leaveType: true },
+          include: { leaveType: { where: { code: "AL" } } },
         },
       },
     });
 
-    const report = [];
-    let totalLiability = 0;
+    const report = employees.map(emp => {
+      const annualLeave = emp.leaveBalances.find(b => b.leaveType?.code === "AL");
+      const unused = annualLeave?.remaining || 0;
+      const dailyRate = emp.basicSalary / 22;
+      const cashValue = Math.round(unused * dailyRate * 100) / 100;
+      return {
+        employeeId: emp.id,
+        name: `${emp.firstName} ${emp.lastName}`,
+        basicSalary: emp.basicSalary,
+        entitled: annualLeave?.entitled || 30,
+        used: annualLeave?.used || 0,
+        remaining: unused,
+        cashValue,
+        risk: cashValue > 1500 ? "HIGH" : cashValue > 500 ? "MEDIUM" : "LOW",
+      };
+    });
 
-    for (const emp of employees) {
-      // Get annual leave balance (AL)
-      const annualLeaveBalance = emp.leaveBalances.find(b => b.leaveType?.code === "AL") || emp.leaveBalances.find(b => b.leaveType?.name?.toLowerCase().includes("annual"));
+    const totalLiability = report.reduce((s, r) => s + r.cashValue, 0);
+    res.json({ report, totalLiability: Math.round(totalLiability * 100) / 100 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ── GET leave types ──
 router.get("/types", async (req, res) => {
