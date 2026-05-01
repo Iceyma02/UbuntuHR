@@ -165,8 +165,7 @@ router.get("/liability", async (req, res) => {
 
     for (const emp of employees) {
       // Get annual leave balance (AL)
-      const annualLeaveBalance = emp.leaveBalances.find(b => b.leaveType?.code === "AL") || 
-                                  emp.leaveBalances.find(b => b.leaveType?.name?.toLowerCase().includes("annual"));
+      const annualLeaveBalance = emp.leaveBalances.find(b => b.leaveType?.code === "AL") || emp.leaveBalances.find(b => b.leaveType?.name?.toLowerCase().includes("annual"));
 
 // ── GET leave types ──
 router.get("/types", async (req, res) => {
