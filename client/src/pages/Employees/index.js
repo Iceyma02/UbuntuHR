@@ -16,6 +16,8 @@ export default function Employees() {
   const [showModal, setShowModal]   = useState(false);
   const [selected, setSelected]     = useState(null);
   const [loading, setLoading]       = useState(false);
+  const [showDeptModal, setShowDeptModal] = useState(false);
+  const [newDeptName, setNewDeptName] = useState("");
 
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "", nationalId: "",
@@ -31,7 +33,7 @@ export default function Employees() {
 
   useEffect(() => {
     loadEmployees();
-    getDepartments().then(r => setDepts(r.data)).catch(console.error);
+    loadDepartments();
   }, []);
 
   const loadEmployees = () => {
@@ -41,19 +43,59 @@ export default function Employees() {
     getEmployees(params).then(r => setEmployees(r.data)).catch(console.error);
   };
 
+  const loadDepartments = () => {
+    getDepartments().then(r => setDepts(r.data)).catch(console.error);
+  };
+
   useEffect(() => { loadEmployees(); }, [search, statusFilter]);
+
+  const handleCreateDepartment = async (e) => {
+    e.preventDefault();
+    if (!newDeptName.trim()) {
+      toast.error("Department name required");
+      return;
+    }
+    try {
+      const res = await createDepartment({ name: newDeptName });
+      setDepts(prev => [...prev, res.data]);
+      setShowDeptModal(false);
+      setNewDeptName("");
+      toast.success("Department created successfully!");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to create department");
+    }
+  };
 
   const handleCreate = async e => {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = { ...form, basicSalary: parseFloat(form.basicSalary) };
+      const payload = { 
+        ...form, 
+        basicSalary: parseFloat(form.basicSalary),
+        // Ensure empty strings are sent as null for optional fields
+        departmentId: form.departmentId || null,
+        ecocashNumber: form.ecocashNumber || null,
+        address: form.address || null,
+        nextOfKin: form.nextOfKin || null,
+        nextOfKinPhone: form.nextOfKinPhone || null,
+      };
       const res = await createEmployee(payload);
       setEmployees(p => [res.data, ...p]);
       setShowModal(false);
-      setForm({ firstName: "", lastName: "", email: "", phone: "", nationalId: "", taxNumber: "", nssaNumber: "", dateOfBirth: "", gender: "MALE", jobTitle: "", departmentId: "", contractType: "PERMANENT", basicSalary: "", currency: "USD", paymentMethod: "BANK_TRANSFER", bankName: "", bankAccount: "", ecocashNumber: "", startDate: "", address: "", nextOfKin: "", nextOfKinPhone: "" });
+      // Reset form
+      setForm({ 
+        firstName: "", lastName: "", email: "", phone: "", nationalId: "",
+        taxNumber: "", nssaNumber: "", dateOfBirth: "", gender: "MALE",
+        jobTitle: "", departmentId: "", contractType: "PERMANENT",
+        basicSalary: "", currency: "USD",
+        paymentMethod: "BANK_TRANSFER", bankName: "", bankAccount: "",
+        ecocashNumber: "", startDate: "", address: "",
+        nextOfKin: "", nextOfKinPhone: "",
+      });
       toast.success(`${res.data.firstName} ${res.data.lastName} added successfully!`);
     } catch (err) {
+      console.error("Create error:", err);
       toast.error(err.response?.data?.error || "Failed to add employee");
     } finally { setLoading(false); }
   };
@@ -82,10 +124,6 @@ export default function Employees() {
             <option value="ACTIVE">Active</option>
             <option value="PROBATION">Probation</option>
             <option value="TERMINATED">Terminated</option>
-          </select>
-          <select className="form-select" style={{ width: 160 }}>
-            <option value="">All Departments</option>
-            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
             <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} employees</span>
@@ -164,6 +202,7 @@ export default function Employees() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
               {[
+                { label: "Gender", value: selected.gender || "—" },
                 { label: "National ID", value: selected.nationalId || "—" },
                 { label: "ZIMRA Tax No", value: selected.taxNumber || "—" },
                 { label: "NSSA Number", value: selected.nssaNumber || "—" },
@@ -172,7 +211,9 @@ export default function Employees() {
                 { label: "Payment Method", value: selected.paymentMethod },
                 { label: "Bank", value: selected.bankName ? `${selected.bankName} · ${selected.bankAccount || ""}` : "—" },
                 { label: "Start Date", value: selected.startDate ? new Date(selected.startDate).toLocaleDateString() : "—" },
+                { label: "Date of Birth", value: selected.dateOfBirth ? new Date(selected.dateOfBirth).toLocaleDateString() : "—" },
                 { label: "Phone", value: selected.phone || "—" },
+                { label: "Email", value: selected.email || "—" },
               ].map((item, i) => (
                 <div key={i}>
                   <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.8, color: "var(--muted)", marginBottom: 3 }}>{item.label}</div>
@@ -187,15 +228,17 @@ export default function Employees() {
       {/* Add Employee Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: "90vh", overflowY: "auto" }}>
             <div className="modal-header">
               <div className="modal-title">Add New Employee</div>
               <button className="btn btn-sm" onClick={() => setShowModal(false)}>✕</button>
             </div>
 
             <form onSubmit={handleCreate}>
-              {/* Personal */}
-              <div style={{ fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12, fontWeight: 600 }}>Personal Information</div>
+              {/* Personal Information */}
+              <div style={{ fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12, fontWeight: 600 }}>
+                Personal Information
+              </div>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">First Name *</label>
@@ -216,6 +259,19 @@ export default function Employees() {
                   <input className="form-input" type="date" value={form.dateOfBirth} onChange={setF("dateOfBirth")} />
                 </div>
               </div>
+              
+              {/* ✅ GENDER DROPDOWN ADDED HERE */}
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Gender</label>
+                  <select className="form-select" value={form.gender} onChange={setF("gender")}>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+              </div>
+              
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Email</label>
@@ -227,8 +283,10 @@ export default function Employees() {
                 </div>
               </div>
 
-              {/* Employment */}
-              <div style={{ fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 12px", fontWeight: 600 }}>Employment Details</div>
+              {/* Employment Details */}
+              <div style={{ fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 12px", fontWeight: 600 }}>
+                Employment Details
+              </div>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Job Title *</label>
@@ -236,10 +294,15 @@ export default function Employees() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Department</label>
-                  <select className="form-select" value={form.departmentId} onChange={setF("departmentId")}>
-                    <option value="">Select Department</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <select className="form-select" value={form.departmentId} onChange={setF("departmentId")} style={{ flex: 1 }}>
+                      <option value="">Select Department</option>
+                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                    <button type="button" className="btn btn-sm" onClick={() => setShowDeptModal(true)} style={{ whiteSpace: "nowrap" }}>
+                      + New
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="form-row">
@@ -255,8 +318,10 @@ export default function Employees() {
                 </div>
               </div>
 
-              {/* Salary */}
-              <div style={{ fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 12px", fontWeight: 600 }}>Salary & Payment</div>
+              {/* Salary & Payment */}
+              <div style={{ fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 12px", fontWeight: 600 }}>
+                Salary & Payment
+              </div>
               <div className="form-row-3">
                 <div className="form-group">
                   <label className="form-label">Basic Salary *</label>
@@ -298,8 +363,10 @@ export default function Employees() {
                 </div>
               )}
 
-              {/* Compliance */}
-              <div style={{ fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 12px", fontWeight: 600 }}>Compliance Numbers</div>
+              {/* Compliance Numbers */}
+              <div style={{ fontSize: 11, color: "var(--gold)", textTransform: "uppercase", letterSpacing: 1, margin: "16px 0 12px", fontWeight: 600 }}>
+                Compliance Numbers
+              </div>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">ZIMRA Tax Number</label>
@@ -318,6 +385,28 @@ export default function Employees() {
                 <button type="button" className="btn" onClick={() => setShowModal(false)} style={{ flex: 1, justifyContent: "center", padding: 11 }}>
                   Cancel
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Department Modal */}
+      {showDeptModal && (
+        <div className="modal-overlay" onClick={() => setShowDeptModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="modal-header">
+              <div className="modal-title">Create Department</div>
+              <button className="btn btn-sm" onClick={() => setShowDeptModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleCreateDepartment}>
+              <div className="form-group">
+                <label className="form-label">Department Name</label>
+                <input className="form-input" value={newDeptName} onChange={e => setNewDeptName(e.target.value)} placeholder="e.g., Human Resources" autoFocus />
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Create</button>
+                <button type="button" className="btn" onClick={() => setShowDeptModal(false)} style={{ flex: 1 }}>Cancel</button>
               </div>
             </form>
           </div>
