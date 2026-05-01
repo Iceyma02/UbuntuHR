@@ -44,14 +44,14 @@ export default function Leave() {
   };
 
   const handleAction = async (id, action) => {
-    try {
-      await actionLeaveRequest(id, action);
-      setRequests(p => p.map(r => r.id === id ? { ...r, status: action === "approve" ? "APPROVED" : "REJECTED" } : r));
-      toast.success(`Leave ${action}d`);
-    } catch (err) {
-      toast.error(err.response?.data?.error || `Failed to ${action}`);
-    }
-  };
+  try {
+    await actionLeaveRequest(id, action);  // ← Remove the third parameter
+    setRequests(p => p.map(r => r.id === id ? { ...r, status: action === "approve" ? "APPROVED" : "REJECTED" } : r));
+    toast.success(`Leave ${action}d`);
+  } catch (err) {
+    toast.error(err.response?.data?.error || `Failed to ${action}`);
+  }
+};
 
   const statusBadge = { PENDING: "badge-gold", APPROVED: "badge-green", REJECTED: "badge-red", CANCELLED: "badge-gray" };
 
