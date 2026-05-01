@@ -174,7 +174,7 @@ export default function Employees() {
           </select>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
             <span style={{ fontSize: 11, color: "var(--muted)" }}>{filtered.length} employees</span>
-            <button className="btn btn-sm">Export CSV</button>
+            <button className="btn btn-sm" onClick={handleExportCSV}>Export CSV</button>
           </div>
         </div>
 
