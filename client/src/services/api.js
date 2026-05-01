@@ -1,87 +1,78 @@
 import axios from "axios";
 
-const API_URL = process.env.REACT_APP_API_URL || "https://ubuntu-hr.vercel.app/api";
+const BASE = process.env.REACT_APP_API_URL || "";
+const api = axios.create({ baseURL: `${BASE}/api` });
 
-const api = axios.create({
-  baseURL: API_URL,
-  headers: { "Content-Type": "application/json" },
-});
-
-// Add token to requests
+// Attach token to every request
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  const token = localStorage.getItem("zimhr_token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// ─────────────────────────────────────────
-// AUTH
-// ─────────────────────────────────────────
-export const register = (data) => api.post("/auth/register", data);
-export const login = (data) => api.post("/auth/login", data);
-export const getMe = () => api.get("/auth/me");
+// Global 401 handler
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem("zimhr_token");
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
 
-// ─────────────────────────────────────────
-// EMPLOYEES
-// ─────────────────────────────────────────
-export const getEmployees = (params) => api.get("/employees", { params });
-export const getEmployee = (id) => api.get(`/employees/${id}`);
-export const createEmployee = (data) => api.post("/employees", data);
+// ── Auth ──
+export const login    = (data) => api.post("/auth/login", data);
+export const register = (data) => api.post("/auth/register", data);
+export const getMe    = ()     => api.get("/auth/me");
+
+// ── Employees ──
+export const getEmployees   = (params) => api.get("/employees", { params });
+export const getEmployee    = (id)     => api.get(`/employees/${id}`);
+export const createEmployee = (data)   => api.post("/employees", data);
 export const updateEmployee = (id, data) => api.put(`/employees/${id}`, data);
 export const terminateEmployee = (id, data) => api.post(`/employees/${id}/terminate`, data);
-export const getDepartments = () => api.get("/employees/meta/departments");
+export const getDepartments = ()       => api.get("/employees/meta/departments");
 export const createDepartment = (data) => api.post("/employees/meta/departments", data);
 
-// ─────────────────────────────────────────
-// PAYROLL
-// ─────────────────────────────────────────
-export const getPayrollRuns = () => api.get("/payroll");
-export const createPayrollRun = (data) => api.post("/payroll", data);
-export const getPayrollRun = (id) => api.get(`/payroll/${id}`);
-export const lockPayrollRun = (id) => api.post(`/payroll/${id}/lock`);
-export const processPayroll = (data) => api.post("/payroll/process", data);
-export const calculatePayroll = (data) => api.post("/payroll/calculate", data);
-export const getPayrollItems = (runId) => api.get(`/payroll/${runId}/items`);
-export const updatePayrollItem = (runId, empId, data) => api.put(`/payroll/${runId}/items/${empId}`, data);
+// ── Payroll ──
+export const getPayrollRuns    = ()          => api.get("/payroll/runs");
+export const getPayrollRun     = (id)        => api.get(`/payroll/runs/${id}`);
+export const calculatePayroll  = (data)      => api.post("/payroll/calculate", data);
+export const createPayrollRun  = (data)      => api.post("/payroll/runs", data);
+export const lockPayrollRun    = (id)        => api.post(`/payroll/runs/${id}/lock`);
+export const exportBankFile    = (id, bank)  => api.get(`/payroll/runs/${id}/export/${bank}`, { responseType: "blob" });
 
-// ─────────────────────────────────────────
-// LEAVE
-// ─────────────────────────────────────────
-export const getLeaveRequests = () => api.get("/leave");
-export const createLeaveRequest = (data) => api.post("/leave", data);
-export const actionLeaveRequest = (id, action) => api.put(`/leave/${id}/${action}`);
-export const getLeaveTypes = () => api.get("/leave/types");
-export const getLeaveBalances = () => api.get("/leave/balances");
-export const getLeaveLiability = () => api.get("/leave/liability");
-export const getPublicHolidays = (year) => api.get(`/leave/holidays?year=${year}`);
+// ── Leave ──
+export const getLeaveRequests  = (params)    => api.get("/leave/requests", { params });
+export const createLeaveRequest = (data)     => api.post("/leave/requests", data);
+export const actionLeaveRequest = (id, action, data) => api.post(`/leave/requests/${id}/${action}`, data);
+export const getLeaveBalances  = (empId)     => api.get(`/leave/balances/${empId}`);
+export const getLeaveLiability = ()          => api.get("/leave/liability");
+export const getLeaveTypes     = ()          => api.get("/leave/types");
+export const getPublicHolidays = (year)      => api.get("/leave/holidays", { params: { year } });
 
-// ─────────────────────────────────────────
-// COMPLIANCE
-// ─────────────────────────────────────────
-export const getCompliance = () => api.get("/compliance");
-export const getTaxTables = () => api.get("/compliance/tax-tables");
-export const generatePayeReturn = (period) => api.get(`/compliance/paye-return/${period}`, { responseType: "blob" });
-export const generateNssaReturn = (period) => api.get(`/compliance/nssa-return/${period}`, { responseType: "blob" });
-export const calculatePenalty = (data) => api.post("/compliance/penalty", data);
-export const fileCompliance = (id, data) => api.post(`/compliance/${id}/file`, data);
+// ── Compliance ──
+export const getCompliance      = ()          => api.get("/compliance");
+export const getTaxTables       = (year)      => api.get("/compliance/tax-tables", { params: { year } });
+export const generatePayeReturn = (period)    => api.get(`/compliance/paye-return/${period}`, { responseType: "blob" });
+export const generateNssaReturn = (period)    => api.get(`/compliance/nssa-return/${period}`, { responseType: "blob" });
+export const calculatePenalty   = (data)      => api.post("/compliance/penalty", data);
+export const fileCompliance     = (id, data)  => api.post(`/compliance/${id}/file`, data);
 
-// ─────────────────────────────────────────
-// PAYSLIPS
-// ─────────────────────────────────────────
-export const getPayslips = (runId) => api.get(`/payslips/${runId}`);
-export const generatePayslip = (runId, empId) => api.post(`/payslips/${runId}/${empId}`, {}, { responseType: "blob" });
-export const bulkGeneratePayslips = (runId) => api.post(`/payslips/bulk/${runId}`);
-export const generatePayslipHtml = (runId, empId) => api.get(`/payslips/preview/${runId}/${empId}`);
-export const sendWhatsappPayslip = (runId, empId) => api.post(`/payslips/${runId}/${empId}/whatsapp`);
-export const sendEmailPayslip = (runId, empId) => api.post(`/payslips/${runId}/${empId}/email`);
+// ── Payslips ──
+export const getPayslipsByRun   = (runId)     => api.get(`/payslips/run/${runId}`);
+export const getEmployeePayslips = (empId)    => api.get(`/payslips/employee/${empId}`);
+export const generatePayslipHtml = (runId, empId) => api.get(`/payslips/generate/${runId}/${empId}`);
+export const bulkGeneratePayslips = (runId)   => api.post(`/payslips/bulk-generate/${runId}`);
 
-// ─────────────────────────────────────────
-// ANALYTICS
-// ─────────────────────────────────────────
+// ── Analytics ──
 export const getAnalyticsDashboard = () => api.get("/analytics/dashboard");
-export const getLeaveUtilization = () => api.get("/analytics/leave-utilization");
-export const getPayrollForecast = () => api.get("/analytics/forecast");
+export const getLeaveUtilization   = () => api.get("/analytics/leave-utilization");
+
+// ── Company ──
+export const getCompany    = () => api.get("/company");
+export const updateCompany = (data) => api.put("/company", data);
 
 export default api;
