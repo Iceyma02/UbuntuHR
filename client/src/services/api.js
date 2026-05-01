@@ -44,11 +44,11 @@ export const createPayrollRun  = (data)      => api.post("/payroll/runs", data);
 export const lockPayrollRun    = (id)        => api.post(`/payroll/runs/${id}/lock`);
 export const exportBankFile    = (id, bank)  => api.get(`/payroll/runs/${id}/export/${bank}`, { responseType: "blob" });
 
-// ── Leave (FIXED) ──
-export const getLeaveRequests  = ()          => api.get("/leave");
-export const createLeaveRequest = (data)     => api.post("/leave", data);
-export const actionLeaveRequest = (id, action) => api.put(`/leave/${id}/${action}`);
-export const getLeaveBalances  = ()          => api.get("/leave/balances");
+// ── Leave ──
+export const getLeaveRequests  = (params)    => api.get("/leave/requests", { params });
+export const createLeaveRequest = (data)     => api.post("/leave/requests", data);
+export const actionLeaveRequest = (id, action, data) => api.post(`/leave/requests/${id}/${action}`, data);
+export const getLeaveBalances  = (empId)     => api.get(`/leave/balances/${empId}`);
 export const getLeaveLiability = ()          => api.get("/leave/liability");
 export const getLeaveTypes     = ()          => api.get("/leave/types");
 export const getPublicHolidays = (year)      => api.get("/leave/holidays", { params: { year } });
