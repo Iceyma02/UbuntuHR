@@ -66,6 +66,56 @@ export default function Employees() {
     }
   };
 
+  // ✅ CSV Export Function - MOVED OUTSIDE handleCreate
+  const handleExportCSV = () => {
+    if (filtered.length === 0) {
+      toast.error("No employees to export");
+      return;
+    }
+    
+    const headers = [
+      "Employee Number", "First Name", "Last Name", "Email", "Phone",
+      "Department", "Job Title", "Contract Type", "Employment Status",
+      "Basic Salary", "Currency", "Payment Method", "Bank Name", "Bank Account",
+      "National ID", "ZIMRA Tax Number", "NSSA Number", "Start Date", "Date of Birth", "Gender"
+    ];
+    
+    const rows = filtered.map(emp => [
+      emp.employeeNumber || "",
+      emp.firstName || "",
+      emp.lastName || "",
+      emp.email || "",
+      emp.phone || "",
+      emp.department?.name || "",
+      emp.jobTitle || "",
+      emp.contractType || "",
+      emp.employmentStatus || "",
+      emp.basicSalary || 0,
+      emp.currency || "USD",
+      emp.paymentMethod || "",
+      emp.bankName || "",
+      emp.bankAccount || "",
+      emp.nationalId || "",
+      emp.taxNumber || "",
+      emp.nssaNumber || "",
+      emp.startDate ? new Date(emp.startDate).toLocaleDateString() : "",
+      emp.dateOfBirth ? new Date(emp.dateOfBirth).toLocaleDateString() : "",
+      emp.gender || "",
+    ]);
+    
+    const csvContent = [headers, ...rows].map(row => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `employees_${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`${filtered.length} employees exported`);
+  };
+
   const handleCreate = async e => {
     e.preventDefault();
     setLoading(true);
@@ -73,7 +123,6 @@ export default function Employees() {
       const payload = { 
         ...form, 
         basicSalary: parseFloat(form.basicSalary),
-        // Ensure empty strings are sent as null for optional fields
         departmentId: form.departmentId || null,
         ecocashNumber: form.ecocashNumber || null,
         address: form.address || null,
@@ -83,7 +132,6 @@ export default function Employees() {
       const res = await createEmployee(payload);
       setEmployees(p => [res.data, ...p]);
       setShowModal(false);
-      // Reset form
       setForm({ 
         firstName: "", lastName: "", email: "", phone: "", nationalId: "",
         taxNumber: "", nssaNumber: "", dateOfBirth: "", gender: "MALE",
@@ -93,53 +141,6 @@ export default function Employees() {
         ecocashNumber: "", startDate: "", address: "",
         nextOfKin: "", nextOfKinPhone: "",
       });
-      const handleExportCSV = () => {
-  if (filtered.length === 0) {
-    toast.error("No employees to export");
-    return;
-  }
-  
-  const headers = [
-    "Employee Number", "First Name", "Last Name", "Email", "Phone",
-    "Department", "Job Title", "Contract Type", "Employment Status",
-    "Basic Salary", "Currency", "Payment Method", "Bank Name", "Bank Account",
-    "National ID", "ZIMRA Tax Number", "NSSA Number", "Start Date", "Date of Birth"
-  ];
-  
-  const rows = filtered.map(emp => [
-    emp.employeeNumber || "",
-    emp.firstName || "",
-    emp.lastName || "",
-    emp.email || "",
-    emp.phone || "",
-    emp.department?.name || "",
-    emp.jobTitle || "",
-    emp.contractType || "",
-    emp.employmentStatus || "",
-    emp.basicSalary || 0,
-    emp.currency || "USD",
-    emp.paymentMethod || "",
-    emp.bankName || "",
-    emp.bankAccount || "",
-    emp.nationalId || "",
-    emp.taxNumber || "",
-    emp.nssaNumber || "",
-    emp.startDate ? new Date(emp.startDate).toLocaleDateString() : "",
-    emp.dateOfBirth ? new Date(emp.dateOfBirth).toLocaleDateString() : "",
-  ]);
-  
-  const csvContent = [headers, ...rows].map(row => row.join(",")).join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `employees_${new Date().toISOString().split("T")[0]}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast.success(`${filtered.length} employees exported`);
-};
       toast.success(`${res.data.firstName} ${res.data.lastName} added successfully!`);
     } catch (err) {
       console.error("Create error:", err);
@@ -307,7 +308,7 @@ export default function Employees() {
                 </div>
               </div>
               
-              {/* ✅ GENDER DROPDOWN ADDED HERE */}
+              {/* Gender Dropdown */}
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Gender</label>
