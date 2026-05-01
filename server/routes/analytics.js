@@ -5,91 +5,84 @@ const { protect } = require("../middleware/auth");
 const prisma = new PrismaClient();
 router.use(protect);
 
-// ── Main analytics dashboard ──
+// ── Analytics dashboard ──
 router.get("/dashboard", async (req, res) => {
   try {
     const companyId = req.user.companyId;
-    const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth() + 1;
-
-    const [
-      totalEmployees,
-      activeEmployees,
-      departments,
-      recentRuns,
-      pendingLeave,
-      complianceLogs,
-    ] = await Promise.all([
-      prisma.employee.count({ where: { companyId } }),
-      prisma.employee.count({ where: { companyId, employmentStatus: "ACTIVE" } }),
-      prisma.department.findMany({
-        where: { companyId },
-        include: {
-          _count: { select: { employees: true } },
-          employees: { select: { basicSalary: true, employmentStatus: true } },
-        },
-      }),
-      prisma.payrollRun.findMany({
-        where: { companyId },
-        orderBy: { period: "desc" },
-        take: 12,
-      }),
-      prisma.leaveRequest.count({
-        where: { employee: { companyId }, status: "PENDING" },
-      }),
-      prisma.complianceLog.findMany({
-        where: { companyId, status: { in: ["PENDING", "OVERDUE"] } },
-        orderBy: { dueDate: "asc" },
-      }),
-    ]);
-
-    // Department breakdown
-    const deptStats = departments.map(d => ({
-      name: d.name,
-      headcount: d._count.employees,
-      totalSalary: d.employees
-        .filter(e => e.employmentStatus === "ACTIVE")
-        .reduce((s, e) => s + e.basicSalary, 0),
-    }));
-
-    // Payroll trend (last 12 months)
-    const payrollTrend = recentRuns.map(r => ({
-      period: r.period,
-      gross: r.totalGross,
-      net: r.totalNet,
-      paye: r.totalPaye,
-      nssa: r.totalNssa,
-    }));
-
-    // Current month stats
-    const currentRun = recentRuns.find(r => r.period === `${currentYear}-${String(currentMonth).padStart(2, "0")}`);
-
-    // ZIMRA forecast (next 3 months)
-    const avgPaye = recentRuns.length > 0
-      ? recentRuns.slice(0, 3).reduce((s, r) => s + r.totalPaye, 0) / Math.min(3, recentRuns.length)
-      : 0;
-
-    const forecast = [1, 2, 3].map(i => {
-      const m = ((currentMonth - 1 + i) % 12) + 1;
-      const y = currentYear + Math.floor((currentMonth - 1 + i) / 12);
-      return {
-        period: `${y}-${String(m).padStart(2, "0")}`,
-        estimatedPaye: Math.round(avgPaye * 100) / 100,
-        dueDate: `${y}-${String(m + 1 > 12 ? 1 : m + 1).padStart(2, "0")}-10`,
-      };
+    
+    // Employee stats
+    const employees = await prisma.employee.findMany({
+      where: { companyId },
+      include: { department: true },
     });
-
+    
+    const activeEmployees = employees.filter(e => e.employmentStatus === "ACTIVE");
+    
+    // Payroll runs
+    const payrollRuns = await prisma.payrollRun.findMany({
+      where: { companyId },
+      orderBy: { period: "desc" },
+      take: 12,
+      include: { items: true },
+    });
+    
+    // Payroll trend
+    const payrollTrend = payrollRuns.reverse().map(run => ({
+      period: run.period,
+      gross: run.totalGross,
+      net: run.totalNet,
+      paye: run.totalPaye,
+    }));
+    
+    // Current month payroll
+    const currentMonth = payrollRuns[0] || { totalGross: 0, totalNet: 0 };
+    
+    // Department stats
+    const departments = await prisma.department.findMany({
+      where: { companyId },
+      include: { employees: true },
+    });
+    
+    const deptStats = departments.map(dept => ({
+      name: dept.name,
+      headcount: dept.employees.length,
+      totalSalary: dept.employees.reduce((sum, e) => sum + (e.basicSalary || 0), 0),
+    }));
+    
+    // ZIMRA liability
+    const zimraLiability = payrollRuns.reduce((sum, run) => sum + run.totalPaye, 0);
+    
+    // Compliance logs
+    const complianceLogs = await prisma.complianceLog.findMany({
+      where: { companyId, status: { in: ["PENDING", "OVERDUE"] } },
+    });
+    
+    // Forecast next 3 months
+    const lastRun = payrollRuns[0];
+    const forecast = [];
+    const dueDate = new Date();
+    
+    for (let i = 1; i <= 3; i++) {
+      const nextDate = new Date();
+      nextDate.setMonth(nextDate.getMonth() + i);
+      forecast.push({
+        period: `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`,
+        estimatedPaye: lastRun?.totalPaye || 0,
+        dueDate: new Date(nextDate.getFullYear(), nextDate.getMonth(), 10),
+      });
+    }
+    
     res.json({
       summary: {
-        totalEmployees,
-        activeEmployees,
-        pendingLeave,
-        currentMonthPayroll: currentRun?.totalGross || 0,
-        currentMonthNet: currentRun?.totalNet || 0,
-        zimraLiability: complianceLogs.filter(c => c.type === "PAYE").reduce((s, c) => s + (c.amount || 0), 0),
+        totalEmployees: employees.length,
+        activeEmployees: activeEmployees.length,
+        currentMonthPayroll: currentMonth.totalGross,
+        currentMonthNet: currentMonth.totalNet,
+        zimraLiability,
+        pendingLeave: 0,
       },
-      deptStats,
       payrollTrend,
+      deptStats,
       complianceLogs,
       forecast,
     });
@@ -98,46 +91,56 @@ router.get("/dashboard", async (req, res) => {
   }
 });
 
-// ── Headcount over time ──
-router.get("/headcount", async (req, res) => {
+// ── Leave utilization ──
+router.get("/leave-utilization", async (req, res) => {
   try {
-    const employees = await prisma.employee.findMany({
-      where: { companyId: req.user.companyId },
-      select: { startDate: true, terminationDate: true, employmentStatus: true },
-      orderBy: { startDate: "asc" },
+    const balances = await prisma.leaveBalance.findMany({
+      where: { employee: { companyId: req.user.companyId }, year: new Date().getFullYear() },
+      include: { leaveType: true },
     });
-
-    res.json({ employees: employees.length, data: employees });
+    
+    const utilization = {};
+    balances.forEach(b => {
+      if (!utilization[b.leaveType.name]) {
+        utilization[b.leaveType.name] = { entitled: 0, used: 0 };
+      }
+      utilization[b.leaveType.name].entitled += b.entitled;
+      utilization[b.leaveType.name].used += b.used;
+    });
+    
+    const result = Object.entries(utilization).map(([type, data]) => ({
+      type,
+      entitled: data.entitled,
+      used: data.used,
+      utilizationPct: data.entitled > 0 ? Math.round((data.used / data.entitled) * 100) : 0,
+    }));
+    
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── Leave utilization ──
-router.get("/leave-utilization", async (req, res) => {
+// ── Payroll forecast ──
+router.get("/forecast", async (req, res) => {
   try {
-    const year = parseInt(req.query.year) || new Date().getFullYear();
-    const balances = await prisma.leaveBalance.findMany({
-      where: { employee: { companyId: req.user.companyId }, year },
-      include: { leaveType: true },
+    const lastRun = await prisma.payrollRun.findFirst({
+      where: { companyId: req.user.companyId },
+      orderBy: { period: "desc" },
     });
-
-    const byType = {};
-    for (const b of balances) {
-      const key = b.leaveType.name;
-      if (!byType[key]) byType[key] = { entitled: 0, used: 0 };
-      byType[key].entitled += b.entitled;
-      byType[key].used += b.used;
+    
+    const forecast = [];
+    for (let i = 1; i <= 3; i++) {
+      const date = new Date();
+      date.setMonth(date.getMonth() + i);
+      forecast.push({
+        period: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+        estimatedPaye: lastRun?.totalPaye || 0,
+        dueDate: new Date(date.getFullYear(), date.getMonth(), 10),
+      });
     }
-
-    const result = Object.entries(byType).map(([type, v]) => ({
-      type,
-      entitled: v.entitled,
-      used: v.used,
-      utilizationPct: v.entitled > 0 ? Math.round((v.used / v.entitled) * 100) : 0,
-    }));
-
-    res.json(result);
+    
+    res.json(forecast);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
