@@ -151,7 +151,7 @@ router.get("/liability", async (req, res) => {
       include: {
         leaveBalances: {
           where: { year },
-          include: { leaveType: { where: { code: "AL" } } },
+          include: { leaveType: true },
         },
       },
     });
