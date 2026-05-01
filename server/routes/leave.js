@@ -146,28 +146,37 @@ router.get("/balances/:employeeId", async (req, res) => {
 router.get("/liability", async (req, res) => {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
+
     const employees = await prisma.employee.findMany({
       where: { companyId: req.user.companyId, employmentStatus: { in: ["ACTIVE", "PROBATION"] } },
       include: {
         leaveBalances: {
-          where: { year },
           include: { leaveType: true },
         },
       },
     });
 
     const report = employees.map(emp => {
-      const annualLeave = emp.leaveBalances.find(b => b.leaveType?.code === "AL");
-      const unused = annualLeave?.remaining || 0;
+      // Find Annual Leave balance for this year, fall back to any year
+      const allAL = emp.leaveBalances.filter(b => b.leaveType && b.leaveType.code === "AL");
+      const annualLeave = allAL.find(b => b.year === year) || allAL[0] || null;
+
+      const entitled  = annualLeave ? annualLeave.entitled  : 30;
+      const used      = annualLeave ? annualLeave.used      : 0;
+      const pending   = annualLeave ? annualLeave.pending   : 0;
+      const remaining = annualLeave ? annualLeave.remaining : 30;
+
       const dailyRate = emp.basicSalary / 22;
-      const cashValue = Math.round(unused * dailyRate * 100) / 100;
+      const cashValue = Math.round(remaining * dailyRate * 100) / 100;
+
       return {
         employeeId: emp.id,
         name: `${emp.firstName} ${emp.lastName}`,
         basicSalary: emp.basicSalary,
-        entitled: annualLeave?.entitled || 30,
-        used: annualLeave?.used || 0,
-        remaining: unused,
+        entitled,
+        used,
+        pending,
+        remaining,
         cashValue,
         risk: cashValue > 1500 ? "HIGH" : cashValue > 500 ? "MEDIUM" : "LOW",
       };
